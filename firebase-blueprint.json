@@ -1,0 +1,177 @@
+{
+  "entities": {
+    "Exercise": {
+      "title": "Exercise",
+      "description": "A gym exercise or alternative lift tracked week-by-week in kg.",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120,
+          "description": "Display name of the exercise."
+        },
+        "category": {
+          "type": "string",
+          "enum": ["Chest", "Back", "Shoulders", "Legs", "Arms", "Core"],
+          "description": "Muscle group category."
+        },
+        "muscle": {
+          "type": "string",
+          "maxLength": 120,
+          "description": "Target muscle description."
+        },
+        "equipment": {
+          "type": "string",
+          "enum": ["Barbell", "Dumbbell", "Machine", "Cable", "Bodyweight"],
+          "description": "Primary equipment used."
+        },
+        "stepIncrementKg": {
+          "type": "number",
+          "description": "Default weight progression increment in kg."
+        },
+        "orderIndex": {
+          "type": "number",
+          "description": "Display sort index in the weekly matrix."
+        },
+        "notes": {
+          "type": "array",
+          "description": "List of form cues or notes attached to the exercise."
+        },
+        "parentExerciseId": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Parent exercise ID if this record is an alternative."
+        },
+        "ownerId": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "UID of the owning user."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server creation timestamp."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server update timestamp."
+        }
+      },
+      "required": [
+        "name",
+        "category",
+        "muscle",
+        "equipment",
+        "stepIncrementKg",
+        "orderIndex",
+        "ownerId",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "WeekColumn": {
+      "title": "WeekColumn",
+      "description": "A training week column anchored to its ISO Monday date.",
+      "type": "object",
+      "properties": {
+        "startDate": {
+          "type": "string",
+          "maxLength": 10,
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+          "description": "ISO date string (YYYY-MM-DD) for Monday of the week."
+        },
+        "ownerId": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "UID of the owning user."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server creation timestamp."
+        }
+      },
+      "required": ["startDate", "ownerId", "createdAt"]
+    },
+    "WeeklyEntry": {
+      "title": "WeeklyEntry",
+      "description": "Weekly minimum and maximum weight log in kg for an exercise.",
+      "type": "object",
+      "properties": {
+        "exerciseId": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Referenced exercise document ID."
+        },
+        "weekId": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Referenced week document ID."
+        },
+        "minWeightKg": {
+          "type": "number",
+          "description": "Minimum weight logged for the week in kg."
+        },
+        "maxWeightKg": {
+          "type": "number",
+          "description": "Maximum weight logged for the week in kg."
+        },
+        "icons": {
+          "type": "array",
+          "description": "Optional status markers (failure, step_regression, next_up, next_down)."
+        },
+        "notes": {
+          "type": "string",
+          "maxLength": 200,
+          "description": "Optional weekly note."
+        },
+        "ownerId": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "UID of the owning user."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server creation timestamp."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server update timestamp."
+        }
+      },
+      "required": [
+        "exerciseId",
+        "weekId",
+        "minWeightKg",
+        "maxWeightKg",
+        "ownerId",
+        "createdAt",
+        "updatedAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/users/{userId}/exercises/{exerciseId}": {
+      "schema": { "$ref": "#/entities/Exercise" },
+      "description": "Private exercises and alternative lifts belonging to the authenticated owner."
+    },
+    "/users/{userId}/weeks/{weekId}": {
+      "schema": { "$ref": "#/entities/WeekColumn" },
+      "description": "Private training week columns belonging to the authenticated owner."
+    },
+    "/users/{userId}/entries/{entryId}": {
+      "schema": { "$ref": "#/entities/WeeklyEntry" },
+      "description": "Private weekly weight entries belonging to the authenticated owner."
+    }
+  }
+}

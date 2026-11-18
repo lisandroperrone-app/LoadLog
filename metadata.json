@@ -1,0 +1,6 @@
+{
+  "name": "LoadLog",
+  "description": "Week-by-week gym exercise weight tracker for monitoring progressive overload, personal records, and training volume.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

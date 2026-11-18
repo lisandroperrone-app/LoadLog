@@ -1,0 +1,210 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isAuthorizedOwner(userId) {
+      return isSignedIn()
+        && request.auth.uid == userId
+        && request.auth.token.email_verified == true
+        && request.auth.token.email == 'lisandroperrone@gmail.com';
+    }
+
+    function isValidExercise(data, userId) {
+      return data.keys().hasAll([
+          'name',
+          'category',
+          'muscle',
+          'equipment',
+          'stepIncrementKg',
+          'orderIndex',
+          'ownerId',
+          'createdAt',
+          'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'name',
+          'category',
+          'muscle',
+          'equipment',
+          'stepIncrementKg',
+          'orderIndex',
+          'ownerId',
+          'createdAt',
+          'updatedAt',
+          'notes',
+          'parentExerciseId'
+        ])
+        && isValidId(data.ownerId)
+        && data.ownerId == userId
+        && data.name is string
+        && data.name.size() >= 1
+        && data.name.size() <= 120
+        && data.category in ['Chest', 'Back', 'Shoulders', 'Legs', 'Arms', 'Core']
+        && data.muscle is string
+        && data.muscle.size() <= 120
+        && data.equipment in ['Barbell', 'Dumbbell', 'Machine', 'Cable', 'Bodyweight']
+        && data.stepIncrementKg is number
+        && data.stepIncrementKg > 0
+        && data.stepIncrementKg <= 100
+        && data.orderIndex is number
+        && data.orderIndex >= 0
+        && data.orderIndex <= 10000
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp
+        && (!('notes' in data) || (
+          data.notes is list
+          && data.notes.size() <= 30
+          && (data.notes.size() == 0 || (data.notes[0] is string && data.notes[0].size() >= 1 && data.notes[0].size() <= 200))
+        ))
+        && (!('parentExerciseId' in data) || (
+          isValidId(data.parentExerciseId)
+          && existsAfter(/databases/$(database)/documents/users/$(userId)/exercises/$(data.parentExerciseId))
+        ));
+    }
+
+    function isValidWeek(data, userId) {
+      return data.keys().hasAll(['startDate', 'ownerId', 'createdAt'])
+        && data.keys().hasOnly(['startDate', 'ownerId', 'createdAt'])
+        && isValidId(data.ownerId)
+        && data.ownerId == userId
+        && data.startDate is string
+        && data.startDate.size() == 10
+        && data.startDate.matches('^\\d{4}-\\d{2}-\\d{2}$')
+        && data.createdAt is timestamp;
+    }
+
+    function isValidEntry(data, userId) {
+      return data.keys().hasAll([
+          'exerciseId',
+          'weekId',
+          'minWeightKg',
+          'maxWeightKg',
+          'ownerId',
+          'createdAt',
+          'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'exerciseId',
+          'weekId',
+          'minWeightKg',
+          'maxWeightKg',
+          'ownerId',
+          'createdAt',
+          'updatedAt',
+          'icons',
+          'notes'
+        ])
+        && isValidId(data.ownerId)
+        && data.ownerId == userId
+        && isValidId(data.exerciseId)
+        && isValidId(data.weekId)
+        && data.minWeightKg is number
+        && data.minWeightKg >= 0
+        && data.minWeightKg <= 2000
+        && data.maxWeightKg is number
+        && data.maxWeightKg >= data.minWeightKg
+        && data.maxWeightKg <= 2000
+        && (!('icons' in data) || (
+          data.icons is list
+          && data.icons.size() <= 4
+          && data.icons.hasOnly(['failure', 'step_regression', 'next_up', 'next_down'])
+        ))
+        && (!('notes' in data) || (
+          data.notes is string
+          && data.notes.size() <= 200
+        ))
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp
+        && existsAfter(/databases/$(database)/documents/users/$(userId)/exercises/$(data.exerciseId))
+        && existsAfter(/databases/$(database)/documents/users/$(userId)/weeks/$(data.weekId));
+    }
+
+    match /users/{userId}/exercises/{exerciseId} {
+      allow get: if isAuthorizedOwner(userId) && isValidId(exerciseId);
+      allow list: if isAuthorizedOwner(userId) && existing().ownerId == request.auth.uid;
+      allow create: if isAuthorizedOwner(userId)
+        && isValidId(exerciseId)
+        && isValidExercise(incoming(), userId)
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isAuthorizedOwner(userId)
+        && isValidId(exerciseId)
+        && isValidExercise(incoming(), userId)
+        && incoming().ownerId == existing().ownerId
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          incoming().diff(existing()).affectedKeys().hasOnly(['notes', 'updatedAt'])
+          || incoming().diff(existing()).affectedKeys().hasOnly(['parentExerciseId', 'orderIndex', 'updatedAt'])
+          || incoming().diff(existing()).affectedKeys().hasOnly([
+            'name',
+            'category',
+            'muscle',
+            'equipment',
+            'stepIncrementKg',
+            'notes',
+            'parentExerciseId',
+            'orderIndex',
+            'updatedAt'
+          ])
+        );
+      allow delete: if isAuthorizedOwner(userId) && isValidId(exerciseId);
+    }
+
+    match /users/{userId}/weeks/{weekId} {
+      allow get: if isAuthorizedOwner(userId) && isValidId(weekId);
+      allow list: if isAuthorizedOwner(userId) && existing().ownerId == request.auth.uid;
+      allow create: if isAuthorizedOwner(userId)
+        && isValidId(weekId)
+        && isValidWeek(incoming(), userId)
+        && incoming().createdAt == request.time;
+      allow update: if false;
+      allow delete: if isAuthorizedOwner(userId) && isValidId(weekId);
+    }
+
+    match /users/{userId}/entries/{entryId} {
+      allow get: if isAuthorizedOwner(userId) && isValidId(entryId);
+      allow list: if isAuthorizedOwner(userId) && existing().ownerId == request.auth.uid;
+      allow create: if isAuthorizedOwner(userId)
+        && isValidId(entryId)
+        && isValidEntry(incoming(), userId)
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isAuthorizedOwner(userId)
+        && isValidId(entryId)
+        && isValidEntry(incoming(), userId)
+        && incoming().ownerId == existing().ownerId
+        && incoming().exerciseId == existing().exerciseId
+        && incoming().weekId == existing().weekId
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly([
+          'minWeightKg',
+          'maxWeightKg',
+          'icons',
+          'notes',
+          'updatedAt'
+        ]);
+      allow delete: if isAuthorizedOwner(userId) && isValidId(entryId);
+    }
+  }
+}
